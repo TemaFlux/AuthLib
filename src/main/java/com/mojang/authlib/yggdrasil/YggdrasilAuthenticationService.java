@@ -7,20 +7,18 @@ import com.mojang.authlib.UserAuthentication;
 import com.mojang.authlib.exceptions.AuthenticationException;
 import com.mojang.authlib.minecraft.MinecraftSessionService;
 import lombok.Getter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import java.net.Proxy;
 import java.net.URL;
 
 public class YggdrasilAuthenticationService
 implements AuthenticationService {
-    private static final Logger logger = LogManager.getLogger(YggdrasilMinecraftSessionService.class);
+    // private static final Logger logger = LogManager.getLogger(YggdrasilMinecraftSessionService.class);
     @Getter private final String clientToken;
 
     public YggdrasilAuthenticationService(Proxy ignored, String clientToken) {
         this.clientToken = clientToken;
-        logger.debug("Patched AuthenticationService created: '{}'", clientToken);
+        // logger.debug("Patched AuthenticationService created: '{}'", clientToken); # Exception: org.apache.logging.log4j.Logger.debug(Ljava/lang/String;Ljava/lang/Object;)V
     }
 
     @Override public UserAuthentication createUserAuthentication(Agent agent) {
