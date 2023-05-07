@@ -1,90 +1,80 @@
 package com.mojang.authlib.yggdrasil;
 
-import com.google.common.base.Strings;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Sets;
-import com.mojang.authlib.*;
-import com.mojang.authlib.exceptions.AuthenticationException;
-import com.mojang.authlib.yggdrasil.response.ProfileSearchResultsResponse;
-import lombok.RequiredArgsConstructor;
+import com.mojang.authlib.Agent;
+import com.mojang.authlib.GameProfile;
+import com.mojang.authlib.GameProfileRepository;
+import com.mojang.authlib.ProfileLookupCallback;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import pro.gravit.launcher.profiles.PlayerProfile;
+import pro.gravit.launcher.request.uuid.BatchProfileByUsernameRequest;
+import pro.gravit.utils.helper.VerifyHelper;
 
-import java.util.List;
-import java.util.Set;
+import java.util.Arrays;
 
-@RequiredArgsConstructor
 public class YggdrasilGameProfileRepository
 implements GameProfileRepository {
-    private static final Logger LOGGER = LogManager.getLogger();
+    private static final Logger logger = LogManager.getLogger(YggdrasilGameProfileRepository.class);
 
-    private static final String BASE_URL = "https://api.mojang.com/";
-    private static final String SEARCH_PAGE_URL = BASE_URL + "profiles/";
+    private static final long BUSY_WAIT_MS = VerifyHelper.verifyLong(
+        Long.parseLong(
+            System.getProperty("launcher.com.mojang.authlib.busyWait", Long.toString(100L))
+        ), VerifyHelper.L_NOT_NEGATIVE, "launcher.com.mojang.authlib.busyWait can't be < 0"
+    ), ERROR_BUSY_WAIT_MS = VerifyHelper.verifyLong(
+        Long.parseLong(
+            System.getProperty("launcher.com.mojang.authlib.errorBusyWait", Long.toString(500L))
+        ), VerifyHelper.L_NOT_NEGATIVE, "launcher.com.mojang.authlib.errorBusyWait can't be < 0"
+    );
 
-    private static final int
-    ENTRIES_PER_PAGE = 2,
-    MAX_FAIL_COUNT = 3,
-    DELAY_BETWEEN_PAGES = 100,
-    DELAY_BETWEEN_FAILURES = 750;
+    public YggdrasilGameProfileRepository() {
+        logger.debug("Patched GameProfileRepository created");
+    }
 
-    private final YggdrasilAuthenticationService authenticationService;
+    public YggdrasilGameProfileRepository(YggdrasilAuthenticationService ignored) {
+        logger.debug("Patched GameProfileRepository created");
+    }
 
-    @Override public void findProfilesByNames(String[] names, Agent agent, ProfileLookupCallback callback) {
-        Set<String> criteria = Sets.newHashSet();
-        for (String name : names) {
-            if (Strings.isNullOrEmpty(name)) continue;
-            criteria.add(name.toLowerCase());
-        }
+    private static void busyWait(long ms) {
+        try {
+            Thread.sleep(ms);
+        } catch (InterruptedException ignored) {}
+    }
 
-        for (List<String> request : Iterables.partition(criteria, ENTRIES_PER_PAGE)) {
-            boolean failed;
-            int failCount = 0;
+    @Override public void findProfilesByNames(String[] usernames, Agent agent, ProfileLookupCallback callback) {
+        int offset = 0;
+        while (offset < usernames.length) {
+            String[] sliceUsernames = Arrays.copyOfRange(usernames, offset, Math.min(offset + CompatBridge.PROFILES_MAX_BATCH_SIZE, usernames.length));
+            offset += CompatBridge.PROFILES_MAX_BATCH_SIZE;
 
-            do {
-                failed = false;
-                try {
-                    ProfileSearchResultsResponse response = authenticationService.makeRequest(
-                        HttpAuthenticationService.constantURL(SEARCH_PAGE_URL + agent.getName().toLowerCase()),
-                        request,
-                        ProfileSearchResultsResponse.class
-                    ); LOGGER.debug("Page {} returned {} results, parsing", failCount = 0, response.getProfiles().length);
-
-                    Set<String> missing = Sets.newHashSet(request);
-                    for (GameProfile profile : response.getProfiles()) {
-                        LOGGER.debug("Successfully looked up profile {}", profile);
-
-                        missing.remove(profile.getName().toLowerCase());
-                        callback.onProfileLookupSucceeded(profile);
-                    }
-
-                    for (String name : missing) {
-                        LOGGER.debug("Couldn't find profile {}", name);
-                        callback.onProfileLookupFailed(
-                            new GameProfile(null, name),
-                            new ProfileNotFoundException("Server did not find the requested profile")
-                        );
-                    }
-
-                    try {
-                        Thread.sleep(DELAY_BETWEEN_PAGES);
-                    } catch (InterruptedException ignored) {}
-                } catch (AuthenticationException e) {
-                    if (++failCount == MAX_FAIL_COUNT) {
-                        for (String name : request) {
-                            LOGGER.debug("Couldn't find profile {} because of a server error", name);
-                            callback.onProfileLookupFailed(new GameProfile(null, name), e);
-                        }
-
-                        continue;
-                    }
-
-                    try {
-                        Thread.sleep(DELAY_BETWEEN_FAILURES);
-                    } catch (InterruptedException ignored) {}
-
-                    failed = true;
+            PlayerProfile[] sliceProfiles; try {
+                sliceProfiles = new BatchProfileByUsernameRequest(sliceUsernames).request().playerProfiles;
+            } catch (Exception e) {
+                for (String username : sliceUsernames) {
+                    logger.warn("Couldn't find profile '{}': {}", username, e);
+                    callback.onProfileLookupFailed(new GameProfile(null, username), e);
                 }
-            } while (failed);
+
+                busyWait(ERROR_BUSY_WAIT_MS);
+                continue;
+            }
+
+            int len = sliceProfiles.length; for (int i = 0; i < len; i++) {
+                PlayerProfile pp = sliceProfiles[i];
+                if (pp == null) {
+                    String username = sliceUsernames[i];
+                    logger.warn("Couldn't find profile '{}'", username);
+
+                    callback.onProfileLookupFailed(
+                        new GameProfile(null, username),
+                        new ProfileNotFoundException("Server did not find the requested profile")
+                    ); continue;
+                }
+
+                logger.debug("Successfully looked up profile '{}'", pp.username);
+                callback.onProfileLookupSucceeded(YggdrasilMinecraftSessionService.toGameProfile(pp));
+            }
+
+            busyWait(BUSY_WAIT_MS);
         }
     }
 }

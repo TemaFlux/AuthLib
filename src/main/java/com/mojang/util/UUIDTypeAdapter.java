@@ -8,11 +8,11 @@ import java.util.UUID;
 
 public class UUIDTypeAdapter
 extends TypeAdapter<UUID> {
-    @Override public void write(JsonWriter out, UUID value) throws IOException {
+    @Override public void write(JsonWriter out, UUID value) {
         out.value(UUIDTypeAdapter.fromUUID(value));
     }
 
-    @Override public UUID read(JsonReader in) throws IOException {
+    @Override public UUID read(JsonReader in) {
         return UUIDTypeAdapter.fromString(in.nextString());
     }
 

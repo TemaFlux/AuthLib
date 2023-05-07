@@ -1,45 +1,30 @@
 package com.mojang.authlib.yggdrasil;
 
-import com.google.gson.*;
-import com.mojang.authlib.*;
+import com.mojang.authlib.Agent;
+import com.mojang.authlib.AuthenticationService;
+import com.mojang.authlib.GameProfileRepository;
+import com.mojang.authlib.UserAuthentication;
 import com.mojang.authlib.exceptions.AuthenticationException;
-import com.mojang.authlib.exceptions.AuthenticationUnavailableException;
-import com.mojang.authlib.exceptions.InvalidCredentialsException;
-import com.mojang.authlib.exceptions.UserMigratedException;
 import com.mojang.authlib.minecraft.MinecraftSessionService;
-import com.mojang.authlib.properties.PropertyMap;
-import com.mojang.authlib.yggdrasil.response.ProfileSearchResultsResponse;
-import com.mojang.authlib.yggdrasil.response.Response;
-import com.mojang.util.UUIDTypeAdapter;
-import lombok.AccessLevel;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-import java.io.IOException;
-import java.lang.reflect.Type;
 import java.net.Proxy;
 import java.net.URL;
-import java.util.UUID;
 
 public class YggdrasilAuthenticationService
-extends HttpAuthenticationService {
+implements AuthenticationService {
+    private static final Logger logger = LogManager.getLogger(YggdrasilMinecraftSessionService.class);
     @Getter private final String clientToken;
-    private final Gson gson;
 
-    public YggdrasilAuthenticationService(Proxy proxy, String clientToken) {
-        super(proxy);
+    public YggdrasilAuthenticationService(Proxy ignored, String clientToken) {
         this.clientToken = clientToken;
-        gson = new GsonBuilder()
-        .registerTypeAdapter(GameProfile.class, new GameProfileSerializer())
-        .registerTypeAdapter(PropertyMap.class, new PropertyMap.Serializer())
-        .registerTypeAdapter(UUID.class, new UUIDTypeAdapter())
-        .registerTypeAdapter(ProfileSearchResultsResponse.class, new ProfileSearchResultsResponse.Serializer())
-        .create();
+        logger.debug("Patched AuthenticationService created: '{}'", clientToken);
     }
 
     @Override public UserAuthentication createUserAuthentication(Agent agent) {
-        return new YggdrasilUserAuthentication(this, agent);
+        throw new UnsupportedOperationException("createUserAuthentication is used only by Mojang Launcher");
     }
 
     @Override public MinecraftSessionService createMinecraftSessionService() {
@@ -47,42 +32,14 @@ extends HttpAuthenticationService {
     }
 
     @Override public GameProfileRepository createProfileRepository() {
-        return new YggdrasilGameProfileRepository(this);
+        return new YggdrasilGameProfileRepository();
     }
 
-    protected <T extends Response> T makeRequest(URL url, Object input, Class<T> classOfT) throws AuthenticationException {
+    public <T> T makeRequest(URL routeRefresh, Object request, Class<T> aClass) throws AuthenticationException {
         try {
-            String jsonResult = input == null ? performGetRequest(url) : performPostRequest(url, gson.toJson(input), "application/json");
-            T result = gson.fromJson(jsonResult, classOfT);
-            
-            if (result == null) return null;
-            if (StringUtils.isNotBlank(result.getError())) {
-                if ("UserMigratedException".equals(result.getCause())) throw new UserMigratedException(result.getErrorMessage());
-                if ("ForbiddenOperationException".equals(result.getError())) throw new InvalidCredentialsException(result.getErrorMessage());
-                throw new AuthenticationException(result.getErrorMessage());
-            }
-            
-            return result;
-        } catch (IOException | IllegalStateException | JsonParseException e) {
-            throw new AuthenticationUnavailableException("Cannot contact authentication server", e);
-        }
-    }
-
-    @NoArgsConstructor(access = AccessLevel.PRIVATE)
-    private static class GameProfileSerializer
-    implements JsonSerializer<GameProfile>, JsonDeserializer<GameProfile> {
-        @Override public GameProfile deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) throws JsonParseException {
-            JsonObject object = (JsonObject) json;
-            UUID id = object.has("id") ? (UUID)context.deserialize(object.get("id"), UUID.class) : null;
-            String name = object.has("name") ? object.getAsJsonPrimitive("name").getAsString() : null;
-            return new GameProfile(id, name);
-        }
-
-        @Override public JsonElement serialize(GameProfile src, Type typeOfSrc, JsonSerializationContext context) {
-            JsonObject result = new JsonObject();
-            if (src.getId() != null) result.add("id", context.serialize(src.getId()));
-            if (src.getName() != null) result.addProperty("name", src.getName());
-            return result;
+            return aClass.newInstance();
+        } catch (Throwable e) {
+            throw new AuthenticationException();
         }
     }
 }

@@ -8,16 +8,18 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.guava:guava:17.0'
-    implementation 'com.google.code.gson:gson:2.2.4'
-    implementation 'com.google.code.findbugs:jsr305:3.0.2'
+    compileOnly files("libs/Launcher.jar") // Generated GravitLauncher (Launcher.class added with me from Launcher-clean)
 
-    implementation 'org.apache.commons:commons-lang3:3.3.2'
-    implementation 'org.apache.logging.log4j:log4j-core:2.11.0'
-    implementation 'org.apache.logging.log4j:log4j-api:2.11.0'
+    compileOnly 'com.google.guava:guava:17.0'
+    compileOnly 'com.google.code.gson:gson:2.2.4'
+    compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
 
-    implementation 'commons-codec:commons-codec:1.9'
-    implementation 'commons-io:commons-io:2.4'
+    compileOnly 'org.apache.commons:commons-lang3:3.3.2'
+    compileOnly 'org.apache.logging.log4j:log4j-core:2.11.0'
+    compileOnly 'org.apache.logging.log4j:log4j-api:2.11.0'
+
+    compileOnly 'commons-codec:commons-codec:1.9'
+    compileOnly 'commons-io:commons-io:2.4'
 
     compileOnly 'org.projectlombok:lombok:1.18.26'
     annotationProcessor 'org.projectlombok:lombok:1.18.26'
