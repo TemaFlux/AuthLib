@@ -50,7 +50,7 @@ implements GameProfileRepository {
                 sliceProfiles = new BatchProfileByUsernameRequest(sliceUsernames).request().playerProfiles;
             } catch (Exception e) {
                 for (String username : sliceUsernames) {
-                    logger.warn("Couldn't find profile '{}': {}", username, e);
+                    logger.warn("Couldn't find profile '" + username + "': " + e);
                     callback.onProfileLookupFailed(new GameProfile(null, username), e);
                 }
 
@@ -70,7 +70,7 @@ implements GameProfileRepository {
                     ); continue;
                 }
 
-                logger.debug("Successfully looked up profile '{}'", pp.username);
+                logger.debug("Successfully looked up profile '" + pp.username + "'");
                 callback.onProfileLookupSucceeded(YggdrasilMinecraftSessionService.toGameProfile(pp));
             }
 

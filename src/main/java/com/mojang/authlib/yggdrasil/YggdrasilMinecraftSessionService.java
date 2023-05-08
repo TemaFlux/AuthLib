@@ -46,7 +46,7 @@ extends BaseMinecraftSessionService {
     }
 
     public static void fillTextureProperties(GameProfile profile, PlayerProfile pp) {
-        logger.debug("fillTextureProperties, Username: '{}'", profile.getName());
+        logger.debug("fillTextureProperties, Username: '" + profile.getName() + "'");
         if (NO_TEXTURES) return;
 
         Map<MinecraftProfileTexture.Type, MinecraftProfileTexture> textures = new HashMap<>();
@@ -68,7 +68,7 @@ extends BaseMinecraftSessionService {
         payload.profileName = pp.username;
 
         String serializedData = Base64.getEncoder().encodeToString(GSON.toJson(payload).getBytes(StandardCharsets.UTF_8));
-        logger.debug("Write textures {}", serializedData);
+        logger.debug("Write textures " + serializedData);
 
         profile.getProperties().put("textures", new Property("textures", serializedData, ""));
     }
@@ -95,7 +95,7 @@ extends BaseMinecraftSessionService {
     @Override public GameProfile fillProfileProperties(GameProfile profile, boolean requireSecure) {
         UUID uuid = profile.getId();
 
-        logger.debug("fillProfileProperties, UUID: {}", uuid);
+        logger.debug("fillProfileProperties, UUID: " + uuid);
         if (uuid == null) return profile;
 
         PlayerProfile pp; try {
@@ -110,20 +110,20 @@ extends BaseMinecraftSessionService {
             return profile;
         }
 
-        logger.debug("Successfully fetched profile properties for '{}'", profile);
+        logger.debug("Successfully fetched profile properties for '" + profile + "'");
         fillTextureProperties(profile, pp);
         return toGameProfile(pp);
     }
 
     @Override public Map<MinecraftProfileTexture.Type, MinecraftProfileTexture> getTextures(GameProfile profile, boolean requireSecure) {
-        logger.debug("getTextures, Username: '{}', UUID: '{}'", profile.getName(), profile.getId());
+        logger.debug("getTextures, Username: '" + profile.getName() + "', UUID: '" + profile.getId() + "'");
 
         EnumMap<MinecraftProfileTexture.Type, MinecraftProfileTexture> textures = new EnumMap<>(MinecraftProfileTexture.Type.class);
         if (!NO_TEXTURES) {
             try {
                 Property texturesProperty = Iterables.getFirst(profile.getProperties().get("textures"), null);
                 if (texturesProperty != null) {
-                    logger.trace("Read textures property {}", texturesProperty.getValue());
+                    logger.trace("Read textures property " + texturesProperty.getValue());
 
                     String serializedData = new String(Base64.getDecoder().decode(texturesProperty.getValue()), StandardCharsets.UTF_8);
                     MinecraftTexturesProperty payload = GSON.fromJson(serializedData, MinecraftTexturesProperty.class);
@@ -135,15 +135,15 @@ extends BaseMinecraftSessionService {
         }
 
         for (Map.Entry<MinecraftProfileTexture.Type, MinecraftProfileTexture> entry : textures.entrySet())
-            logger.trace("Found {}: {}", entry.getKey(), entry.getValue().getUrl());
+            logger.trace("Found " + entry.getKey() + ": " + entry.getValue().getUrl());
 
-        logger.trace("Found {} textures", textures.size());
+        logger.trace("Found " + textures.size() + " textures");
         return textures;
     }
 
-    public GameProfile hasJoinedServer(GameProfile profile, String serverID) throws AuthenticationUnavailableException {
+    @Override public GameProfile hasJoinedServer(GameProfile profile, String serverID) throws AuthenticationUnavailableException {
         String username = profile.getName();
-        logger.debug("checkServer, Username: '{}', Server ID: {}", username, serverID);
+        logger.debug("checkServer, Username: '" + username + "', Server ID: " + serverID);
 
         PlayerProfile pp; try {
             pp = new CheckServerRequest(username, serverID).request().playerProfile;
@@ -163,10 +163,9 @@ extends BaseMinecraftSessionService {
         return (YggdrasilAuthenticationService) super.getAuthenticationService();
     }
 
-    @Override
-    public void joinServer(GameProfile profile, String accessToken, String serverID) throws AuthenticationException {
+    @Override public void joinServer(GameProfile profile, String accessToken, String serverID) throws AuthenticationException {
         String username = profile.getName();
-        logger.debug("joinServer, Username: '{}', Access token: {}, Server ID: {}", username, accessToken, serverID);
+        logger.debug("joinServer, Username: '" + username + "', Access token: " + accessToken + ", Server ID: " + serverID);
 
         boolean success; try {
             success = new JoinServerRequest(username, accessToken, serverID).request().allow;
